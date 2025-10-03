@@ -1,0 +1,44 @@
+{
+  "plasticity_model": {
+    "description": "人格の可塑性（変化しやすさ）の設定",
+    "model_type": "exponential_decay",
+    "parameters": {
+      "youth_period_days": {
+        "value": 365,
+        "description": "若い時期の日数。この期間は最大の可塑性を維持します"
+      },
+      "maturity_point_days": {
+        "value": 1095,
+        "description": "成熟点。この時点で変化が困難になり始めます（閾値が100に到達）"
+      },
+      "decay_rate": {
+        "value": 0.002,
+        "description": "減衰率。大きいほど急速に固定化します（0.01～0.1推奨）"
+      },
+      "minimum_plasticity": {
+        "value": 0.05,
+        "description": "最小可塑性。完全に固定化されることを防ぎます"
+      }
+    },
+    "presets": {
+      "rapid_formation": {
+        "description": "急速な人格形成（30日で固定化開始）",
+        "youth_period_days": 15,
+        "maturity_point_days": 30,
+        "decay_rate": 0.08
+      },
+      "standard": {
+        "description": "標準的な人格形成（3年で固定化）",
+        "youth_period_days": 365,
+        "maturity_point_days": 1095,
+        "decay_rate": 0.002
+      },
+      "gradual": {
+        "description": "ゆっくりとした人格形成（10年かけて固定化）",
+        "youth_period_days": 1095,
+        "maturity_point_days": 3650,
+        "decay_rate": 0.001
+      }
+    }
+  }
+}
