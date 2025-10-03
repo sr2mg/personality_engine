@@ -5,6 +5,7 @@ import { z } from "zod";
 import { generateObject } from "ai";
 import { config } from "dotenv";
 import { PhilosophyManager, Philosophy } from "./philosophyManager";
+import { google } from "@ai-sdk/google";
 
 config({ path: ".env.development" });
 if (process.stdout.isTTY) {
@@ -201,7 +202,7 @@ for (const filePath of targetFiles) {
   const triggerHits = countHits(text_content, currentPhilosophy.hooks.triggers);
   const tabooHits = countHits(text_content, currentPhilosophy.hooks.taboos);
 
-  const llm = openai("o4-mini");
+  const llm = google("gemini-2.5-flash");
 
   const fix_prompt = `
   以下のような信念と立場を持つあなたはあるテキストを読みました。
