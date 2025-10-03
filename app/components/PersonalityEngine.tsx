@@ -35,6 +35,17 @@ interface ProcessingResult {
   newPhilosophy: Philosophy;
 }
 
+interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+  metadata?: {
+    emotional_tone?: string;
+    confidence?: number;
+    trigger_detected?: boolean;
+    taboo_detected?: boolean;
+  };
+}
+
 export default function PersonalityEngine() {
   const [philosophy, setPhilosophy] = useState<Philosophy | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -49,6 +60,11 @@ export default function PersonalityEngine() {
   );
   const [newCharacterName, setNewCharacterName] = useState<string>("");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+
+  // 一問一答機能の状態
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [currentQuestion, setCurrentQuestion] = useState<string>("");
+  const [isChatProcessing, setIsChatProcessing] = useState(false);
 
   // Load available characters on mount
   useEffect(() => {
@@ -315,6 +331,66 @@ export default function PersonalityEngine() {
       console.error("Failed to delete character:", error);
       alert("キャラクターの削除中にエラーが発生しました");
     }
+  };
+
+  const handleChatSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentQuestion.trim() || isChatProcessing) return;
+
+    const question = currentQuestion.trim();
+    const userMessage: ChatMessage = {
+      role: "user",
+      content: question,
+    };
+
+    setChatMessages((prev) => [...prev, userMessage]);
+    setCurrentQuestion("");
+    setIsChatProcessing(true);
+
+    try {
+      const response = await fetch("/api/chat-with-personality", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question: question,
+          characterName: selectedCharacter,
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        const assistantMessage: ChatMessage = {
+          role: "assistant",
+          content: result.answer,
+          metadata: result.metadata,
+        };
+        setChatMessages((prev) => [...prev, assistantMessage]);
+      } else {
+        const error = await response.json();
+        setChatMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: "申し訳ありません。回答の生成中にエラーが発生しました。",
+          },
+        ]);
+      }
+    } catch (error) {
+      console.error("Chat error:", error);
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: "申し訳ありません。通信エラーが発生しました。",
+        },
+      ]);
+    } finally {
+      setIsChatProcessing(false);
+    }
+  };
+
+  const clearChat = () => {
+    setChatMessages([]);
   };
 
   return (
@@ -678,6 +754,126 @@ export default function PersonalityEngine() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* 一問一答セクション */}
+      {philosophy && (
+        <div className="mt-8 border-t border-gray-200 dark:border-gray-700 pt-8">
+          <h3 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">
+            一問一答
+          </h3>
+
+          <div className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+            人格「{selectedCharacter}
+            」に「発言」を投げることができます。あなたのことは感知しておらず、直前の発言を覚えることはありません。学習もされません。
+          </div>
+
+          {/* 会話履歴 */}
+          {chatMessages.length > 0 && (
+            <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg max-h-96 overflow-y-auto">
+              <div className="space-y-4">
+                {chatMessages.map((message, index) => (
+                  <div
+                    key={index}
+                    className={`${message.role === "user" ? "text-right" : "text-left"}`}
+                  >
+                    <div
+                      className={`inline-block p-3 rounded-lg max-w-[80%] ${
+                        message.role === "user"
+                          ? "bg-blue-600 text-white"
+                          : "bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-600"
+                      }`}
+                    >
+                      <div className="text-sm mb-1 font-medium opacity-70">
+                        {message.role === "user" ? "あなた" : selectedCharacter}
+                      </div>
+                      <div className="whitespace-pre-wrap">
+                        {message.content}
+                      </div>
+                      {message.metadata && (
+                        <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-600 text-xs opacity-70">
+                          {message.metadata.emotional_tone && (
+                            <div>感情: {message.metadata.emotional_tone}</div>
+                          )}
+                          {message.metadata.confidence !== undefined && (
+                            <div>
+                              確信度:{" "}
+                              {(message.metadata.confidence * 100).toFixed(0)}%
+                            </div>
+                          )}
+                          {message.metadata.trigger_detected && (
+                            <div className="text-yellow-300">
+                              ⚡ トリガー検出
+                            </div>
+                          )}
+                          {message.metadata.taboo_detected && (
+                            <div className="text-red-300">⚠️ タブー検出</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {isChatProcessing && (
+                  <div className="text-left">
+                    <div className="inline-block p-3 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-600">
+                      <div className="text-sm mb-1 font-medium opacity-70">
+                        {selectedCharacter}
+                      </div>
+                      <div className="flex space-x-1">
+                        <span className="animate-bounce">●</span>
+                        <span
+                          className="animate-bounce"
+                          style={{ animationDelay: "0.1s" }}
+                        >
+                          ●
+                        </span>
+                        <span
+                          className="animate-bounce"
+                          style={{ animationDelay: "0.2s" }}
+                        >
+                          ●
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* 入力フォーム */}
+          <form onSubmit={handleChatSubmit} className="flex gap-2">
+            <input
+              type="text"
+              value={currentQuestion}
+              onChange={(e) => setCurrentQuestion(e.target.value)}
+              placeholder="質問を入力してください..."
+              disabled={isChatProcessing}
+              className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+            />
+            <button
+              type="submit"
+              disabled={!currentQuestion.trim() || isChatProcessing}
+              className={`px-6 py-3 rounded-lg font-medium transition-all ${
+                !currentQuestion.trim() || isChatProcessing
+                  ? "bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+                  : "bg-blue-600 hover:bg-blue-700 text-white"
+              }`}
+            >
+              質問
+            </button>
+            {chatMessages.length > 0 && (
+              <button
+                type="button"
+                onClick={clearChat}
+                className="px-4 py-3 rounded-lg font-medium transition-all border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+              >
+                クリア
+              </button>
+            )}
+          </form>
         </div>
       )}
     </div>
