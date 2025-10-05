@@ -40,4 +40,8 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# profile images
+/public/profile-images/*
+!/public/profile-images/.gitkeep
+
 ###
