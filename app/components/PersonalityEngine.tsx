@@ -60,6 +60,8 @@ export default function PersonalityEngine() {
   );
   const [newCharacterName, setNewCharacterName] = useState<string>("");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   // 一問一答機能の状態
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -76,6 +78,7 @@ export default function PersonalityEngine() {
     if (formationType === "continue" && selectedCharacter) {
       loadPhilosophy();
       loadAvailableFiles();
+      loadProfileImage();
 
       // Refresh file list every 5 seconds
       const interval = setInterval(() => {
@@ -125,6 +128,81 @@ export default function PersonalityEngine() {
       }
     } catch (error) {
       console.error("Failed to load available files:", error);
+    }
+  };
+
+  const loadProfileImage = async () => {
+    try {
+      const response = await fetch(
+        `/api/profile-image?character=${selectedCharacter}`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setProfileImage(data.imagePath);
+      }
+    } catch (error) {
+      console.error("Failed to load profile image:", error);
+    }
+  };
+
+  const handleImageUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // ファイルサイズチェック（5MBまで）
+    if (file.size > 5 * 1024 * 1024) {
+      alert("ファイルサイズが大きすぎます（最大5MB）");
+      return;
+    }
+
+    setIsUploadingImage(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+      formData.append("characterName", selectedCharacter);
+
+      const response = await fetch("/api/profile-image", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setProfileImage(data.imagePath + `?t=${Date.now()}`); // キャッシュ回避
+      } else {
+        const error = await response.json();
+        alert(error.error || "画像のアップロードに失敗しました");
+      }
+    } catch (error) {
+      console.error("Image upload error:", error);
+      alert("画像のアップロード中にエラーが発生しました");
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+  const handleImageDelete = async () => {
+    if (!confirm("プロフィール画像を削除しますか？")) return;
+
+    try {
+      const response = await fetch(
+        `/api/profile-image?character=${selectedCharacter}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      if (response.ok) {
+        setProfileImage(null);
+      } else {
+        alert("画像の削除に失敗しました");
+      }
+    } catch (error) {
+      console.error("Image delete error:", error);
+      alert("画像の削除中にエラーが発生しました");
     }
   };
 
@@ -496,10 +574,57 @@ export default function PersonalityEngine() {
       {/* Current Philosophy Status */}
       {philosophy && (
         <div className="mb-8 p-6 bg-gray-50 dark:bg-gray-800 rounded-lg">
-          <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
+          <h3 className="text-lg font-semibold mb-6 text-gray-900 dark:text-white">
             現在の人格状態 -{" "}
             {formationType === "new" ? newCharacterName : selectedCharacter}
           </h3>
+
+          {/* プロフィール画像セクション */}
+          <div className="flex items-center gap-6 mb-6">
+            <div className="flex flex-col items-center gap-2">
+              <div className="relative w-48 h-48 rounded-full overflow-hidden border-2 border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700">
+                {profileImage ? (
+                  <img
+                    src={profileImage}
+                    alt={selectedCharacter}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-8xl text-gray-400 dark:text-gray-500">
+                    👤
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-1">
+                <label
+                  className={`px-3 py-1 text-xs rounded-md cursor-pointer transition-all ${
+                    isUploadingImage
+                      ? "bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed"
+                      : "bg-blue-600 hover:bg-blue-700 text-white"
+                  }`}
+                >
+                  {isUploadingImage ? "..." : "変更"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    disabled={isUploadingImage}
+                    className="hidden"
+                  />
+                </label>
+                {profileImage && (
+                  <button
+                    onClick={handleImageDelete}
+                    disabled={isUploadingImage}
+                    className="px-3 py-1 text-xs rounded-md bg-red-600 hover:bg-red-700 text-white transition-all disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed"
+                  >
+                    削除
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
